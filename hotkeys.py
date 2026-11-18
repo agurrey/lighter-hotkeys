@@ -27,7 +27,7 @@ SYMBOL = os.environ.get("SYMBOL", "BTC")
 LEVERAGE = int(os.environ.get("LEVERAGE", "50"))
 MARGIN_PCT = float(os.environ.get("MARGIN_PCT", "10"))  # % del portfolio usado como margen
 SLIPPAGE = float(os.environ.get("SLIPPAGE_PCT", "0.3")) / 100
-STOP_PCT = float(os.environ.get("STOP_PCT", "0.05")) / 100  # stop-loss nativo a esta distancia del entry; 0 = sin stop
+STOP_PCT = float(os.environ.get("STOP_PCT", "0")) / 100  # stop-loss nativo opcional a esta distancia del entry; 0 = sin stop
 ACCOUNT_INDEX = int(os.environ.get("ACCOUNT_INDEX", "0") or 0)
 API_KEY_INDEX = int(os.environ.get("API_KEY_INDEX", "0") or 0)
 API_PRIVATE_KEY = os.environ.get("API_PRIVATE_KEY", "")
