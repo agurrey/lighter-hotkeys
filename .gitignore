@@ -1,0 +1,5 @@
+.env
+testnet_wallet.json
+.venv/
+__pycache__/
+*.pyc
