@@ -3,36 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lighter Hotkeys</title>
+  <title>BTC · Lighter Hotkeys</title>
   <style>
-    :root { color-scheme: dark; --bg:#090b10; --card:#11151d; --line:#252b37; --muted:#8a93a5; --green:#41d99a; --red:#ff6577; --amber:#f2c66d; }
+    :root { color-scheme:dark; --card:#11151d; --line:#252b37; --muted:#8a93a5; --green:#41d99a; --red:#ff6577; --amber:#f2c66d; }
     * { box-sizing:border-box; }
     body { margin:0; background:#450a12; color:#edf1f7; font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; transition:background 120ms ease-out; }
     body.focus-active { background:#064e2b; }
     body.focus-paused { background:#450a12; }
-    main { width:min(100%,520px); margin:auto; padding:20px; }
-    header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:18px; }
-    h1 { font-size:16px; letter-spacing:.08em; margin:0; }
-    .badges { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
-    .badge { padding:4px 8px; border:1px solid var(--line); border-radius:5px; color:var(--muted); font-size:11px; font-weight:700; }
+    main { width:min(100%,420px); margin:auto; padding:20px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px; }
+    h1 { font-size:14px; letter-spacing:.06em; margin:0; white-space:nowrap; }
+    .badges { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:4px; }
+    .badge { padding:4px 6px; border:1px solid var(--line); border-radius:5px; color:var(--muted); font-size:10px; font-weight:700; }
     #focus.active { color:var(--green); border-color:#24664e; background:#10291f; }
     #focus.paused { color:var(--muted); background:#151922; }
     #connection.error { color:var(--red); }
     #mode.sim { color:var(--amber); }
-    .card { background:var(--card); border:1px solid var(--line); border-radius:9px; padding:14px; margin-bottom:12px; }
-    .market { display:flex; justify-content:space-between; gap:12px; }
-    .market-tabs { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
-    .market-tabs button { padding:10px; }
-    .market-tabs button.selected { border-color:var(--green); background:#123428; box-shadow:0 0 0 1px #24664e inset; }
-    .market-tabs strong { display:block; font-size:16px; }
-    .market-tabs small { display:block; margin-top:2px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:9px; padding:16px; margin-bottom:12px; }
     .label { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
-    .value { font-size:17px; margin-top:3px; }
+    .value { font-size:18px; margin-top:5px; }
     .muted { color:var(--muted); }
     .positive { color:var(--green); }
     .negative { color:var(--red); }
+    #stop { margin-top:6px; font-size:12px; }
     .keys { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
-    button { font:inherit; color:inherit; background:#171d28; border:1px solid var(--line); border-radius:7px; padding:13px 5px; cursor:pointer; }
+    button { font:inherit; color:inherit; background:#171d28; border:1px solid var(--line); border-radius:7px; padding:14px 5px; cursor:pointer; }
     button:hover { border-color:#59667d; }
     button:disabled { opacity:.45; cursor:not-allowed; }
     button b { display:block; font-size:22px; margin-bottom:3px; }
@@ -40,21 +35,17 @@
     #long b { color:var(--green); }
     #short b { color:var(--red); }
     #close b { color:var(--amber); }
-    #position { white-space:pre-line; }
-    #notice { min-height:22px; margin:10px 0; color:var(--muted); }
+    #notice { min-height:22px; margin:12px 2px 0; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
     #notice.ok { color:var(--green); }
     #notice.error { color:var(--red); }
     #notice.warning { color:var(--amber); }
-    #logs { margin:8px 0 0; padding:0; list-style:none; color:var(--muted); font-size:11px; }
-    #logs li { padding:5px 0; border-bottom:1px solid #1b202a; overflow-wrap:anywhere; }
-    footer { color:var(--muted); font-size:11px; margin-top:14px; }
-    @media (max-width:380px) { main { padding:12px; } .value { font-size:14px; } }
+    @media (max-width:380px) { main { padding:12px; } .value { font-size:15px; } }
   </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>LIGHTER // <span id="symbol">—</span></h1>
+    <h1>LIGHTER // <span id="symbol">BTC</span></h1>
     <div class="badges">
       <span id="mode" class="badge">CARGANDO</span>
       <span id="connection" class="badge">CONECTANDO</span>
@@ -62,17 +53,10 @@
     </div>
   </header>
 
-  <section id="market-tabs" class="market-tabs" aria-label="Mercado"></section>
-
-  <section class="card market">
-    <div><div class="label">Bid / Ask</div><div id="price" class="value">—</div></div>
-    <div><div class="label">Equity</div><div id="equity" class="value">—</div></div>
-  </section>
-
   <section class="card">
     <div class="label">Posición</div>
-    <div id="position" class="value">Sin posición</div>
-    <div id="stop" class="muted">—</div>
+    <div id="position" class="value muted">Sin posición</div>
+    <div id="stop" class="muted">SL 0.3% · 50x</div>
   </section>
 
   <section class="keys">
@@ -82,23 +66,16 @@
   </section>
 
   <div id="notice" role="status" aria-live="polite"></div>
-
-  <section class="card">
-    <div class="label">Actividad</div>
-    <ul id="logs"></ul>
-  </section>
-
-  <footer>Las teclas solo actúan con este panel enfocado.<br>E cierra únicamente el mercado seleccionado.<br>Cerrar el panel no cierra posiciones ni cancela stops.</footer>
 </main>
 <script>
 (() => {
   const token = location.hash.slice(1);
   const $ = id => document.getElementById(id);
-  const money = new Intl.NumberFormat('en-US', {maximumFractionDigits: 4});
+  const pnlFormat = new Intl.NumberFormat('en-US', {maximumFractionDigits: 2});
+  const priceFormat = new Intl.NumberFormat('en-US', {maximumFractionDigits: 4});
   let ws;
   let authenticated = false;
   let reconnectTimer;
-  let currentSymbol = null;
   const pending = new Set();
 
   function updateFocus() {
@@ -112,8 +89,8 @@
   function setConnection(text, error = false) {
     $('connection').textContent = text;
     $('connection').className = `badge${error ? ' error' : ''}`;
-    document.querySelectorAll('button[data-action], button[data-symbol]').forEach(button => {
-      button.disabled = !authenticated || (button.dataset.action !== 'select' && !currentSymbol && button.dataset.action);
+    document.querySelectorAll('button[data-action]').forEach(button => {
+      button.disabled = !authenticated;
     });
   }
 
@@ -122,80 +99,43 @@
     $('notice').className = kind;
   }
 
-  function addLog(message) {
-    const item = document.createElement('li');
-    item.textContent = `${new Date().toLocaleTimeString('es-ES')} · ${message}`;
-    $('logs').prepend(item);
-    while ($('logs').children.length > 8) $('logs').lastChild.remove();
-  }
-
-  function renderMarkets(markets, selected) {
-    const tabs = $('market-tabs');
-    const signature = markets.map(market => `${market.symbol}:${market.leverage}:${market.stop_pct}`).join('|');
-    if (tabs.dataset.signature !== signature) {
-      tabs.dataset.signature = signature;
-      tabs.replaceChildren();
-      markets.forEach(market => {
-        const button = document.createElement('button');
-        button.dataset.symbol = market.symbol;
-        button.addEventListener('click', () => send('select', market.symbol));
-        const name = document.createElement('strong');
-        name.textContent = market.symbol;
-        const details = document.createElement('small');
-        details.textContent = `${market.leverage}x · SL ${market.stop_pct}%`;
-        button.append(name, details);
-        tabs.append(button);
-      });
-    }
-    tabs.querySelectorAll('button[data-symbol]').forEach(button => {
-      button.classList.toggle('selected', button.dataset.symbol === selected);
-      button.disabled = !authenticated;
-    });
-  }
-
   function render(state) {
-    currentSymbol = state.symbol;
-    document.title = `${state.symbol} · Lighter Hotkeys`;
     $('symbol').textContent = state.symbol;
     $('mode').textContent = state.dry_run ? 'SIMULACIÓN' : (state.testnet ? 'TESTNET' : 'MAINNET');
     $('mode').className = `badge${state.dry_run ? ' sim' : ''}`;
-    renderMarkets(state.markets, state.symbol);
-    $('price').textContent = `${money.format(state.bid)} / ${money.format(state.ask)}`;
-    $('equity').textContent = `$${money.format(state.equity)}`;
     const p = state.position;
     if (!p) {
       $('position').textContent = 'Sin posición';
       $('position').className = 'value muted';
     } else {
-      const liquidation = p.liquidation > 0 ? `\nLiq ${money.format(p.liquidation)}` : '';
-      $('position').textContent = `${p.side} ${p.size} ${state.symbol}\nEntry ${money.format(p.entry)} · PnL ${p.pnl >= 0 ? '+' : ''}${money.format(p.pnl)}${liquidation}`;
+      const pnl = `${p.pnl >= 0 ? '+' : ''}${pnlFormat.format(p.pnl)}`;
+      $('position').textContent = `${p.side} ${p.size} ${state.symbol} · PnL ${pnl}`;
       $('position').className = `value ${p.pnl >= 0 ? 'positive' : 'negative'}`;
     }
-    const stop = state.paper_stop ? `Stop simulado @ ${money.format(state.paper_stop)} · ${state.stop_pct}%` : `SL nuevas entradas ${state.stop_pct}% · ${state.leverage}x · ${state.margin_pct}% margen`;
-    $('stop').textContent = stop;
+    $('stop').textContent = state.paper_stop ? `SL simulado @ ${priceFormat.format(state.paper_stop)}` : `SL ${state.stop_pct}% · ${state.leverage}x`;
   }
 
-  function send(action, symbol = currentSymbol) {
+  function send(action) {
     if (!authenticated || !ws || ws.readyState !== WebSocket.OPEN) {
-      notice('Panel desconectado: no se ha enviado nada', 'error');
+      notice('Panel desconectado', 'error');
       return;
     }
     const id = crypto.randomUUID();
     pending.add(id);
     setConnection(`OCUPADO ${pending.size}`);
-    ws.send(JSON.stringify({type: 'command', action, symbol, command_id: id}));
+    ws.send(JSON.stringify({type:'command', action, command_id:id}));
   }
 
   function connect() {
     if (!token) {
       setConnection('FALTA TOKEN', true);
-      notice('Abre el panel desde ./start-web.sh', 'error');
+      notice('Abre el panel con btc-web', 'error');
       return;
     }
     authenticated = false;
     setConnection('CONECTANDO');
     ws = new WebSocket(`ws://${location.host}/ws`);
-    ws.onopen = () => ws.send(JSON.stringify({type: 'auth', token}));
+    ws.onopen = () => ws.send(JSON.stringify({type:'auth', token}));
     ws.onmessage = event => {
       const message = JSON.parse(event.data);
       if (message.type === 'hello') {
@@ -203,19 +143,16 @@
         setConnection('CONECTADO');
         if (pending.size) {
           pending.clear();
-          notice('Reconectado. Los comandos pendientes no se reenviaron.', 'warning');
+          notice('Reconectado · comandos no reenviados', 'warning');
         }
-      } else if (message.type === 'logs') {
-        $('logs').replaceChildren();
-        message.messages.forEach(addLog);
       } else if (message.type === 'state') {
         render(message.state);
-      } else if (message.type === 'log') {
-        addLog(message.message);
       } else if (message.type === 'result') {
         pending.delete(message.command_id);
         setConnection(pending.size ? `OCUPADO ${pending.size}` : 'CONECTADO');
-        notice(message.warning || message.message, message.warning ? 'warning' : (message.ok ? 'ok' : 'error'));
+        const labels = {long:'LONG OK', short:'SHORT OK', close:'CIERRE OK'};
+        const text = message.unchanged ? 'Nada que cerrar' : (labels[message.action] || message.message);
+        notice(message.warning || (message.ok ? text : message.message), message.warning ? 'warning' : (message.ok ? 'ok' : 'error'));
       } else if (message.type === 'error') {
         notice(message.message, 'error');
       }
@@ -237,7 +174,7 @@
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     const target = event.target;
     if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
-    const actions = {KeyQ: 'long', KeyW: 'short', KeyE: 'close'};
+    const actions = {KeyQ:'long', KeyW:'short', KeyE:'close'};
     const action = actions[event.code];
     if (!action || !document.hasFocus() || document.hidden) return;
     event.preventDefault();
