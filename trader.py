@@ -119,11 +119,15 @@ class Terminal:
         size = float(p.position) * (1 if p.sign >= 0 else -1) if p else 0
         position = None
         if p:
+            entry = float(p.avg_entry_price)
+            pnl = float(p.unrealized_pnl)
+            margin = abs(size) * entry / LEVERAGE
             position = {
                 "side": "LONG" if size > 0 else "SHORT",
                 "size": abs(size),
-                "entry": float(p.avg_entry_price),
-                "pnl": float(p.unrealized_pnl),
+                "entry": entry,
+                "pnl": pnl,
+                "pnl_pct": pnl / margin * 100 if margin else 0.0,
                 "liquidation": float(p.liquidation_price),
             }
         return {
