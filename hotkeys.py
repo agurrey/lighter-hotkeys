@@ -27,7 +27,7 @@ SYMBOL = os.environ.get("SYMBOL", "BTC")
 LEVERAGE = int(os.environ.get("LEVERAGE", "50"))
 MARGIN_PCT = float(os.environ.get("MARGIN_PCT", "10"))  # % del portfolio usado como margen
 SLIPPAGE = float(os.environ.get("SLIPPAGE_PCT", "0.3")) / 100
-STOP_PCT = float(os.environ.get("STOP_PCT", "0")) / 100  # stop-loss nativo opcional a esta distancia del entry; 0 = sin stop
+STOP_PCT = float(os.environ.get("STOP_PCT", "0.3")) / 100  # stop-loss nativo a esta distancia del entry; 0 = sin stop
 ACCOUNT_INDEX = int(os.environ.get("ACCOUNT_INDEX", "0") or 0)
 API_KEY_INDEX = int(os.environ.get("API_KEY_INDEX", "0") or 0)
 API_PRIVATE_KEY = os.environ.get("API_PRIVATE_KEY", "")
@@ -77,7 +77,8 @@ class Terminal:
             log(f"Apalancamiento {SYMBOL} fijado a {LEVERAGE}x (cross)")
         log(f"{'TESTNET' if TESTNET else 'MAINNET'} · {SYMBOL} market_id={self.market.id} · "
             f"{'DRY-RUN (simulado)' if DRY_RUN else f'{LEVERAGE}x · {MARGIN_PCT}% margen por entrada'}")
-        log("Q compra · W vende · E cierra · Ctrl+C sale")
+        stop = f"stop duro {STOP_PCT * 100:g}%" if STOP_PCT else "sin stop"
+        log(f"Q compra · W vende · E cierra · {stop} · Ctrl+C sale")
 
     async def price(self):
         book = await lighter.OrderApi(self.api).order_book_orders(market_id=self.market.id, limit=1)

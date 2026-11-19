@@ -13,7 +13,7 @@ Defaults are meant for BTC perp, but the symbol, leverage, size and stop are con
 | `E` | Close the whole position (reduce-only) |
 | `Ctrl+C` | Quit (positions stay open on Lighter) |
 
-Optional: set `STOP_PCT` (e.g. `0.1`) to attach a **native stop-loss** to every entry, at that distance from your fill price. It lives on the exchange, protects you even if you close the terminal or lose internet, and is cancelled automatically when the position closes or flips. Disabled by default.
+By default, every entry gets a **native hard stop-loss** 0.3% from your fill price. It lives on the exchange, protects you even if you close the terminal or lose internet, and is cancelled automatically when the position closes or flips. Set `STOP_PCT=0` to disable it or choose another distance. A stop triggers a market order with the configured slippage cap, so execution is not guaranteed during an extreme gap or crash.
 
 The terminal needs keyboard focus: Alt+Tab to it (or click it once), then trade. No global keylogging, no mouse.
 
@@ -35,7 +35,7 @@ chmod 600 .env
 - `SYMBOL=BTC`, `LEVERAGE=50` (set on your account at startup, cross margin).
 - `MARGIN_PCT=10`: each entry uses 10% of your portfolio as margin. At 50x that is a position of 5x your equity — know your risk.
 - `SLIPPAGE_PCT=0.3`: worst acceptable price on market orders.
-- `STOP_PCT=0`: no stop-loss by default. Set e.g. `0.1` to attach a native stop at 0.1% from entry.
+- `STOP_PCT=0.3`: native hard stop at 0.3% from entry by default. Set `0` to disable it.
 - `ACCOUNT_INDEX`, `API_KEY_INDEX`, `API_PRIVATE_KEY`: only needed with `DRY_RUN=0`. Create a **dedicated API key index** at https://app.lighter.xyz/apikeys (not the one the web app uses). Never share the private key; it never leaves your machine except as local order signatures.
 
 ## Run
