@@ -108,9 +108,8 @@
       $('position').textContent = 'Sin posición';
       $('position').className = 'value muted';
     } else {
-      const pnl = `${p.pnl >= 0 ? '+' : ''}${pnlFormat.format(p.pnl)}`;
       const pnlPct = `${p.pnl_pct >= 0 ? '+' : ''}${pnlFormat.format(p.pnl_pct)}%`;
-      $('position').textContent = `${p.side} ${p.size} ${state.symbol} · PnL ${pnl} (${pnlPct})`;
+      $('position').textContent = `${p.side} ${p.size} ${state.symbol} · PnL ${pnlPct}`;
       $('position').className = `value ${p.pnl >= 0 ? 'positive' : 'negative'}`;
     }
     $('stop').textContent = state.paper_stop ? `SL simulado @ ${priceFormat.format(state.paper_stop)}` : `SL ${state.stop_pct}% · ${state.leverage}x`;

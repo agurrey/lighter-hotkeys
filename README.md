@@ -13,7 +13,7 @@ Defaults are meant for BTC perp, but the symbol, leverage, size and stop are con
 | `E` | Close the whole position (reduce-only) |
 | `Ctrl+C` | Quit the CLI (positions stay open on Lighter) |
 
-The panel is intentionally minimal: selected side and size, PnL in USD and as a percentage of the position's initial margin (ROE), stop/leverage, connection and one short action confirmation. It shows **ACTIVO** in green when it has keyboard focus and **PAUSADO** in grey when it does not; the whole background also turns green or red. Paused only means that hotkeys cannot fire: position updates and the native stop remain active. Keep Lighter visible beside the panel and focus the panel once; there are no global hotkeys and no keylogging.
+The panel is intentionally minimal: selected side and size, PnL as a percentage of the position's initial margin (ROE), stop/leverage, connection and one short action confirmation. It shows **ACTIVO** in green when it has keyboard focus and **PAUSADO** in grey when it does not; the whole background also turns green or red. Paused only means that hotkeys cannot fire: position updates and the native stop remain active. Keep Lighter visible beside the panel and focus the panel once; there are no global hotkeys and no keylogging.
 
 By default, every entry gets a **native hard stop-loss** 0.3% from your fill price. It lives on the exchange, protects you even if you close the panel or lose internet, and is cancelled automatically when the position closes or flips. Set `STOP_PCT=0` to disable it or choose another distance. A stop triggers a market order with the configured slippage cap, so execution is not guaranteed during an extreme gap or crash.
 
@@ -51,7 +51,7 @@ The page is served only on `127.0.0.1`, with a random session token in the URL f
 Optional aliases:
 
 ```bash
-alias btc-web='cd ~/lighter-hotkeys && ./start-web.sh'
+alias btc='cd ~/lighter-hotkeys && ./start-web.sh'
 alias btc-web-stop='cd ~/lighter-hotkeys && ./stop-web.sh'
 ```
 
@@ -63,7 +63,7 @@ Runtime files (`.web.url`, `.web.pid`, `.web.log`) are local and gitignored. If 
 .venv/bin/python hotkeys.py
 ```
 
-Optional alias: `alias btc='cd ~/lighter-hotkeys && .venv/bin/python hotkeys.py'`
+Optional alias: `alias btc-cli='cd ~/lighter-hotkeys && .venv/bin/python hotkeys.py'`
 
 ## Safety notes
 
