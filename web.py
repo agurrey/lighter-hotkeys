@@ -92,19 +92,25 @@ class LocalPanel:
     async def command(self, data):
         command_id = data.get("command_id")
         action = data.get("action")
+        symbol = data.get("symbol")
         if not isinstance(command_id, str) or not 1 <= len(command_id) <= 100:
             return {"type": "error", "message": "ID de comando inválido"}
         cached = self.cached_result(command_id)
         if cached:
             return cached
-        if action not in {"long", "short", "close"}:
+        if action not in {"long", "short", "close", "select"}:
             return {"type": "error", "message": "Acción no permitida"}
         async with self.command_lock:
             cached = self.cached_result(command_id)
             if cached:
                 return cached
             try:
-                if action == "long":
+                if action == "select":
+                    selected = await self.terminal.select(symbol)
+                    outcome = {"ok": selected, "message": f"Mercado seleccionado: {symbol}" if selected else "Mercado no permitido"}
+                elif symbol != self.terminal.symbol:
+                    outcome = {"ok": False, "message": "El mercado acaba de cambiar; revisa el panel y pulsa de nuevo"}
+                elif action == "long":
                     outcome = await self.terminal.open(is_ask=False)
                 elif action == "short":
                     outcome = await self.terminal.open(is_ask=True)
@@ -113,7 +119,8 @@ class LocalPanel:
             except Exception as error:
                 self.log(f"ERROR: {error}")
                 outcome = {"ok": False, "message": str(error)}
-            result = {"type": "result", "command_id": command_id, "action": action, **outcome}
+            result = {"type": "result", "command_id": command_id, "action": action,
+                      "symbol": self.terminal.symbol, **outcome}
             self.cache_result(result)
             self.emit(result)
             try:
@@ -168,7 +175,8 @@ class LocalPanel:
             if self.client is None or self.client.closed:
                 continue
             try:
-                await self.send_state()
+                async with self.command_lock:
+                    await self.send_state()
             except Exception as error:
                 text = str(error)
                 if text != self.last_status_error:
@@ -191,7 +199,7 @@ class LocalPanel:
             app.router.add_get("/ws", self.websocket)
             runner = web.AppRunner(app, access_log=None)
             await runner.setup()
-            site = web.TCPSite(runner, host="127.0.0.1", port=self.port)
+            site = web.TCPSite(runner, host="127.0.0.1", port=self.port, shutdown_timeout=2)
             await site.start()
             write_private(URL_FILE, self.url + "\n")
             write_private(PID_FILE, str(os.getpid()) + "\n")

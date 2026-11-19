@@ -18,11 +18,21 @@ if ENV.exists():
 DRY_RUN = os.environ.get("DRY_RUN", "1") == "1"
 TESTNET = os.environ.get("TESTNET", "0") == "1"
 URL = "https://testnet.zklighter.elliot.ai" if TESTNET else "https://mainnet.zklighter.elliot.ai"
-SYMBOL = os.environ.get("SYMBOL", "BTC")
-LEVERAGE = int(os.environ.get("LEVERAGE", "50"))
+DEFAULT_SYMBOL = os.environ.get("SYMBOL", "BTC").upper()
+SYMBOLS = tuple(s.strip().upper() for s in os.environ.get("SYMBOLS", "BTC,LIT").split(",") if s.strip())
+if DEFAULT_SYMBOL not in SYMBOLS:
+    SYMBOLS = (DEFAULT_SYMBOL, *SYMBOLS)
 MARGIN_PCT = float(os.environ.get("MARGIN_PCT", "10"))
 SLIPPAGE = float(os.environ.get("SLIPPAGE_PCT", "0.3")) / 100
-STOP_PCT = float(os.environ.get("STOP_PCT", "0.3")) / 100
+LEGACY_LEVERAGE = int(os.environ.get("LEVERAGE", "50"))
+LEGACY_STOP = float(os.environ.get("STOP_PCT", "0.3"))
+KNOWN_DEFAULTS = {"BTC": (50, 0.3), "LIT": (5, 1.0)}
+MARKET_SETTINGS = {}
+for symbol in SYMBOLS:
+    known_leverage, known_stop = KNOWN_DEFAULTS.get(symbol, (LEGACY_LEVERAGE, LEGACY_STOP))
+    leverage = int(os.environ.get(f"{symbol}_LEVERAGE", LEGACY_LEVERAGE if symbol == DEFAULT_SYMBOL else known_leverage))
+    stop_pct = float(os.environ.get(f"{symbol}_STOP_PCT", LEGACY_STOP if symbol == DEFAULT_SYMBOL else known_stop)) / 100
+    MARKET_SETTINGS[symbol] = {"leverage": leverage, "stop_pct": stop_pct}
 ACCOUNT_INDEX = int(os.environ.get("ACCOUNT_INDEX", "0") or 0)
 API_KEY_INDEX = int(os.environ.get("API_KEY_INDEX", "0") or 0)
 API_PRIVATE_KEY = os.environ.get("API_PRIVATE_KEY", "")
@@ -37,27 +47,40 @@ class Terminal:
     def __init__(self, logger=None):
         self.api = None
         self.signer = None
+        self.symbol = DEFAULT_SYMBOL
+        self.markets = {}
         self.market = None
         self.log = logger or log
-        self.paper = None
-        self.paper_stop = None
+        self.paper = {}
+        self.paper_stop = {}
         self.last_bid = None
         self.last_ask = None
+
+    @property
+    def leverage(self):
+        return MARKET_SETTINGS[self.symbol]["leverage"]
+
+    @property
+    def stop_pct(self):
+        return MARKET_SETTINGS[self.symbol]["stop_pct"]
 
     async def start(self):
         self.api = lighter.ApiClient(configuration=lighter.Configuration(host=URL))
         orders = lighter.OrderApi(self.api)
         books = await orders.order_books()
-        book = next(b for b in books.order_books if b.symbol == SYMBOL)
-        details = await orders.order_book_details(market_id=book.market_id)
-        d = details.order_book_details[0]
-        self.market = type("M", (), {
-            "id": book.market_id,
-            "size_decimals": d.size_decimals,
-            "price_decimals": d.price_decimals,
-            "min_base": float(d.min_base_amount),
-            "min_quote": float(d.min_quote_amount),
-        })()
+        by_symbol = {book.symbol: book for book in books.order_books}
+        for symbol in SYMBOLS:
+            book = by_symbol[symbol]
+            details = await orders.order_book_details(market_id=book.market_id)
+            d = details.order_book_details[0]
+            self.markets[symbol] = type("M", (), {
+                "id": book.market_id,
+                "size_decimals": d.size_decimals,
+                "price_decimals": d.price_decimals,
+                "min_base": float(d.min_base_amount),
+                "min_quote": float(d.min_quote_amount),
+            })()
+        self.market = self.markets[self.symbol]
         if not DRY_RUN:
             import sys
             if not (ACCOUNT_INDEX and API_PRIVATE_KEY):
@@ -69,16 +92,34 @@ class Terminal:
             err = self.signer.check_client()
             if err:
                 sys.exit(f"Clave rechazada por Lighter: {err}")
-            await self.signer.update_leverage(
-                market_index=self.market.id,
-                margin_mode=lighter.SignerClient.CROSS_MARGIN_MODE,
-                leverage=LEVERAGE, api_key_index=API_KEY_INDEX,
-            )
-            self.log(f"Apalancamiento {SYMBOL} fijado a {LEVERAGE}x (cross)")
-        self.log(f"{'TESTNET' if TESTNET else 'MAINNET'} · {SYMBOL} market_id={self.market.id} · "
-                 f"{'DRY-RUN (simulado)' if DRY_RUN else f'{LEVERAGE}x · {MARGIN_PCT}% margen por entrada'}")
-        stop = f"stop duro {STOP_PCT * 100:g}%" if STOP_PCT else "sin stop"
-        self.log(f"Q compra · W vende · E cierra · {stop} · Ctrl+C sale")
+            await self.update_leverage()
+        self.log(f"{'TESTNET' if TESTNET else 'MAINNET'} · {self.symbol} market_id={self.market.id} · "
+                 f"{'DRY-RUN (simulado)' if DRY_RUN else f'{self.leverage}x · {MARGIN_PCT}% margen por entrada'}")
+        markets = " · ".join(f"{s} {MARKET_SETTINGS[s]['leverage']}x SL {MARKET_SETTINGS[s]['stop_pct'] * 100:g}%"
+                             for s in SYMBOLS)
+        self.log(markets)
+        self.log(f"Q compra · W vende · E cierra {self.symbol} · stop duro {self.stop_pct * 100:g}% · Ctrl+C sale")
+
+    async def update_leverage(self):
+        if DRY_RUN:
+            return
+        await self.signer.update_leverage(
+            market_index=self.market.id,
+            margin_mode=lighter.SignerClient.CROSS_MARGIN_MODE,
+            leverage=self.leverage, api_key_index=API_KEY_INDEX,
+        )
+        self.log(f"Apalancamiento {self.symbol} fijado a {self.leverage}x (cross)")
+
+    async def select(self, symbol):
+        if symbol not in self.markets:
+            return False
+        if symbol == self.symbol:
+            return True
+        self.symbol = symbol
+        self.market = self.markets[symbol]
+        await self.update_leverage()
+        self.log(f"Mercado seleccionado: {symbol} · {self.leverage}x · stop {self.stop_pct * 100:g}%")
+        return True
 
     async def shutdown(self):
         if self.api:
@@ -97,16 +138,17 @@ class Terminal:
             acc = data.accounts[0]
             pos = [p for p in acc.positions if p.market_id == self.market.id and float(p.position) != 0]
             return float(acc.total_asset_value), pos
-        if not self.paper:
+        paper = self.paper.get(self.symbol)
+        if not paper:
             return 1000.0, []
-        size = self.paper["size"]
-        mark = (self.last_bid + self.last_ask) / 2 if self.last_bid is not None else self.paper["entry"]
-        pnl = (mark - self.paper["entry"]) * size
+        size = paper["size"]
+        mark = (self.last_bid + self.last_ask) / 2 if self.last_bid is not None else paper["entry"]
+        pnl = (mark - paper["entry"]) * size
         pos = SimpleNamespace(
             market_id=self.market.id,
             position=str(abs(size)),
             sign=1 if size > 0 else -1,
-            avg_entry_price=str(self.paper["entry"]),
+            avg_entry_price=str(paper["entry"]),
             unrealized_pnl=str(pnl),
             liquidation_price="0",
         )
@@ -127,46 +169,49 @@ class Terminal:
                 "liquidation": float(p.liquidation_price),
             }
         return {
-            "symbol": SYMBOL,
+            "symbol": self.symbol,
+            "markets": [{"symbol": s, "leverage": MARKET_SETTINGS[s]["leverage"],
+                         "stop_pct": MARKET_SETTINGS[s]["stop_pct"] * 100} for s in SYMBOLS],
             "bid": bid,
             "ask": ask,
             "equity": equity,
             "position": position,
             "dry_run": DRY_RUN,
             "testnet": TESTNET,
-            "leverage": LEVERAGE,
+            "leverage": self.leverage,
             "margin_pct": MARGIN_PCT,
-            "stop_pct": STOP_PCT * 100,
-            "paper_stop": self.paper_stop if DRY_RUN else None,
+            "stop_pct": self.stop_pct * 100,
+            "paper_stop": self.paper_stop.get(self.symbol) if DRY_RUN else None,
         }
 
     async def status(self):
         state = await self.snapshot()
         p = state["position"]
-        text = f"{SYMBOL} {state['bid']:,.4f}/{state['ask']:,.4f} · equity ${state['equity']:,.2f} · "
+        text = f"{self.symbol} {state['bid']:,.4f}/{state['ask']:,.4f} · equity ${state['equity']:,.2f} · "
         if p:
-            text += (f"posición {p['side']} {p['size']} {SYMBOL} · entry {p['entry']} · "
+            text += (f"posición {p['side']} {p['size']} {self.symbol} · entry {p['entry']} · "
                      f"PnL {p['pnl']} · liq {p['liquidation']}")
         else:
             text += "sin posición"
         self.log(text)
 
-    def size_int(self, btc):
-        return int(round(btc * 10 ** self.market.size_decimals))
+    def size_int(self, amount):
+        return int(round(amount * 10 ** self.market.size_decimals))
 
     def price_int(self, usd):
         return int(round(usd * 10 ** self.market.price_decimals))
 
-    def update_paper(self, btc, is_ask, reduce_only, fill):
-        signed = -btc if is_ask else btc
-        old = self.paper["size"] if self.paper else 0.0
-        old_entry = self.paper["entry"] if self.paper else 0.0
+    def update_paper(self, amount, is_ask, reduce_only, fill):
+        signed = -amount if is_ask else amount
+        paper = self.paper.get(self.symbol)
+        old = paper["size"] if paper else 0.0
+        old_entry = paper["entry"] if paper else 0.0
         new = old + signed
         if reduce_only and old * new < 0:
             new = 0.0
         if abs(new) < 1 / 10 ** self.market.size_decimals / 2:
-            self.paper = None
-            self.paper_stop = None
+            self.paper.pop(self.symbol, None)
+            self.paper_stop.pop(self.symbol, None)
             return
         if old == 0:
             entry = fill
@@ -176,26 +221,26 @@ class Terminal:
             entry = (abs(old) * old_entry + abs(signed) * fill) / abs(new)
         else:
             entry = old_entry
-        self.paper = {"size": new, "entry": entry}
+        self.paper[self.symbol] = {"size": new, "entry": entry}
 
-    async def send(self, btc, is_ask, reduce_only):
+    async def send(self, amount, is_ask, reduce_only):
         bid, ask = await self.price()
         worst = ask * (1 + SLIPPAGE) if not is_ask else bid * (1 - SLIPPAGE)
-        base_amount, price = self.size_int(btc), self.price_int(worst)
+        base_amount, price = self.size_int(amount), self.price_int(worst)
         side = "SELL" if is_ask else "BUY"
         if base_amount <= 0:
             message = "Tamaño 0: nada que enviar"
             self.log(message)
             return {"ok": False, "message": message}
-        if not reduce_only and (btc < self.market.min_base or btc * ask < self.market.min_quote):
-            message = f"Bajo el mínimo del exchange ({self.market.min_base} {SYMBOL} / {self.market.min_quote} USD)"
+        if not reduce_only and (amount < self.market.min_base or amount * ask < self.market.min_quote):
+            message = f"Bajo el mínimo del exchange ({self.market.min_base} {self.symbol} / {self.market.min_quote} USD)"
             self.log(message)
             return {"ok": False, "message": message}
         if DRY_RUN:
             fill = bid if is_ask else ask
-            actual_btc = base_amount / 10 ** self.market.size_decimals
-            self.update_paper(actual_btc, is_ask, reduce_only, fill)
-            message = f"[SIM] {side} {actual_btc:.6f} {SYMBOL} · peor precio {worst:,.4f} · reduce_only={reduce_only}"
+            actual_amount = base_amount / 10 ** self.market.size_decimals
+            self.update_paper(actual_amount, is_ask, reduce_only, fill)
+            message = f"[SIM] {side} {actual_amount:.6f} {self.symbol} · peor precio {worst:,.4f} · reduce_only={reduce_only}"
             self.log(message)
             result = {"ok": True, "message": message, "simulated": True, "tx_hash": None}
         else:
@@ -214,7 +259,7 @@ class Terminal:
                 message = f"ERROR: {err}"
                 self.log(message)
                 return {"ok": False, "message": message}
-            message = f"{side} {btc:.6f} {SYMBOL} enviado · tx {tx_hash}"
+            message = f"{side} {amount:.6f} {self.symbol} enviado · tx {tx_hash}"
             self.log(message)
             result = {"ok": True, "message": message, "simulated": False, "tx_hash": str(tx_hash)}
             await asyncio.sleep(1.5)
@@ -226,7 +271,7 @@ class Terminal:
         return result
 
     async def set_stop(self):
-        if not STOP_PCT:
+        if not self.stop_pct:
             return None
         _, pos = await self.account()
         if not pos:
@@ -235,11 +280,11 @@ class Terminal:
         p = pos[0]
         entry = float(p.avg_entry_price)
         long = p.sign >= 0
-        trigger = entry * (1 - STOP_PCT if long else 1 + STOP_PCT)
+        trigger = entry * (1 - self.stop_pct if long else 1 + self.stop_pct)
         worst = trigger * (1 - SLIPPAGE if long else 1 + SLIPPAGE)
         if DRY_RUN:
-            self.paper_stop = trigger
-            self.log(f"[SIM] stop {'LONG' if long else 'SHORT'} @ {trigger:,.4f} ({STOP_PCT * 100}% del entry)")
+            self.paper_stop[self.symbol] = trigger
+            self.log(f"[SIM] stop {self.symbol} {'LONG' if long else 'SHORT'} @ {trigger:,.4f} ({self.stop_pct * 100}% del entry)")
             return True
         global COI
         COI += 1
@@ -255,22 +300,22 @@ class Terminal:
         if err:
             self.log(f"ERROR al poner el stop: {err}")
             return False
-        self.log(f"Stop-loss puesto @ {trigger:,.4f} ({STOP_PCT * 100}% del entry {entry:,.4f})")
+        self.log(f"Stop-loss {self.symbol} puesto @ {trigger:,.4f} ({self.stop_pct * 100}% del entry {entry:,.4f})")
         return True
 
     async def open(self, is_ask):
         equity, _ = await self.account()
         _, ask = await self.price()
-        btc = equity * MARGIN_PCT / 100 * LEVERAGE / ask
-        btc = int(btc * 10 ** self.market.size_decimals) / 10 ** self.market.size_decimals
-        self.log(f"Entrada {'SHORT' if is_ask else 'LONG'}: ${equity * MARGIN_PCT / 100:,.2f} margen "
-                 f"x{LEVERAGE} = {btc:.6f} {SYMBOL}")
-        return await self.send(btc, is_ask, reduce_only=False)
+        amount = equity * MARGIN_PCT / 100 * self.leverage / ask
+        amount = int(amount * 10 ** self.market.size_decimals) / 10 ** self.market.size_decimals
+        self.log(f"Entrada {self.symbol} {'SHORT' if is_ask else 'LONG'}: ${equity * MARGIN_PCT / 100:,.2f} margen "
+                 f"x{self.leverage} = {amount:.6f} {self.symbol}")
+        return await self.send(amount, is_ask, reduce_only=False)
 
     async def close(self):
         _, pos = await self.account()
         if not pos:
-            message = "No hay posición que cerrar"
+            message = f"No hay posición {self.symbol} que cerrar"
             self.log(message)
             return {"ok": True, "message": message, "unchanged": True}
         p = pos[0]

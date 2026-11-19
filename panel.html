@@ -21,6 +21,11 @@
     #mode.sim { color:var(--amber); }
     .card { background:var(--card); border:1px solid var(--line); border-radius:9px; padding:14px; margin-bottom:12px; }
     .market { display:flex; justify-content:space-between; gap:12px; }
+    .market-tabs { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
+    .market-tabs button { padding:10px; }
+    .market-tabs button.selected { border-color:var(--green); background:#123428; box-shadow:0 0 0 1px #24664e inset; }
+    .market-tabs strong { display:block; font-size:16px; }
+    .market-tabs small { display:block; margin-top:2px; }
     .label { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
     .value { font-size:17px; margin-top:3px; }
     .muted { color:var(--muted); }
@@ -49,13 +54,15 @@
 <body>
 <main>
   <header>
-    <h1>LIGHTER // <span id="symbol">BTC</span></h1>
+    <h1>LIGHTER // <span id="symbol">—</span></h1>
     <div class="badges">
       <span id="mode" class="badge">CARGANDO</span>
       <span id="connection" class="badge">CONECTANDO</span>
       <span id="focus" class="badge paused">PAUSADO</span>
     </div>
   </header>
+
+  <section id="market-tabs" class="market-tabs" aria-label="Mercado"></section>
 
   <section class="card market">
     <div><div class="label">Bid / Ask</div><div id="price" class="value">—</div></div>
@@ -81,7 +88,7 @@
     <ul id="logs"></ul>
   </section>
 
-  <footer>Las teclas solo actúan con este panel enfocado.<br>Cerrar el panel no cierra posiciones ni cancela el stop nativo.</footer>
+  <footer>Las teclas solo actúan con este panel enfocado.<br>E cierra únicamente el mercado seleccionado.<br>Cerrar el panel no cierra posiciones ni cancela stops.</footer>
 </main>
 <script>
 (() => {
@@ -91,6 +98,7 @@
   let ws;
   let authenticated = false;
   let reconnectTimer;
+  let currentSymbol = null;
   const pending = new Set();
 
   function updateFocus() {
@@ -104,8 +112,8 @@
   function setConnection(text, error = false) {
     $('connection').textContent = text;
     $('connection').className = `badge${error ? ' error' : ''}`;
-    document.querySelectorAll('button[data-action]').forEach(button => {
-      button.disabled = !authenticated;
+    document.querySelectorAll('button[data-action], button[data-symbol]').forEach(button => {
+      button.disabled = !authenticated || (button.dataset.action !== 'select' && !currentSymbol && button.dataset.action);
     });
   }
 
@@ -121,10 +129,37 @@
     while ($('logs').children.length > 8) $('logs').lastChild.remove();
   }
 
+  function renderMarkets(markets, selected) {
+    const tabs = $('market-tabs');
+    const signature = markets.map(market => `${market.symbol}:${market.leverage}:${market.stop_pct}`).join('|');
+    if (tabs.dataset.signature !== signature) {
+      tabs.dataset.signature = signature;
+      tabs.replaceChildren();
+      markets.forEach(market => {
+        const button = document.createElement('button');
+        button.dataset.symbol = market.symbol;
+        button.addEventListener('click', () => send('select', market.symbol));
+        const name = document.createElement('strong');
+        name.textContent = market.symbol;
+        const details = document.createElement('small');
+        details.textContent = `${market.leverage}x · SL ${market.stop_pct}%`;
+        button.append(name, details);
+        tabs.append(button);
+      });
+    }
+    tabs.querySelectorAll('button[data-symbol]').forEach(button => {
+      button.classList.toggle('selected', button.dataset.symbol === selected);
+      button.disabled = !authenticated;
+    });
+  }
+
   function render(state) {
+    currentSymbol = state.symbol;
+    document.title = `${state.symbol} · Lighter Hotkeys`;
     $('symbol').textContent = state.symbol;
     $('mode').textContent = state.dry_run ? 'SIMULACIÓN' : (state.testnet ? 'TESTNET' : 'MAINNET');
     $('mode').className = `badge${state.dry_run ? ' sim' : ''}`;
+    renderMarkets(state.markets, state.symbol);
     $('price').textContent = `${money.format(state.bid)} / ${money.format(state.ask)}`;
     $('equity').textContent = `$${money.format(state.equity)}`;
     const p = state.position;
@@ -136,11 +171,11 @@
       $('position').textContent = `${p.side} ${p.size} ${state.symbol}\nEntry ${money.format(p.entry)} · PnL ${p.pnl >= 0 ? '+' : ''}${money.format(p.pnl)}${liquidation}`;
       $('position').className = `value ${p.pnl >= 0 ? 'positive' : 'negative'}`;
     }
-    const stop = state.paper_stop ? `Stop simulado @ ${money.format(state.paper_stop)}` : `Hard stop ${state.stop_pct}% · ${state.leverage}x · ${state.margin_pct}% margen`;
+    const stop = state.paper_stop ? `Stop simulado @ ${money.format(state.paper_stop)} · ${state.stop_pct}%` : `SL nuevas entradas ${state.stop_pct}% · ${state.leverage}x · ${state.margin_pct}% margen`;
     $('stop').textContent = stop;
   }
 
-  function send(action) {
+  function send(action, symbol = currentSymbol) {
     if (!authenticated || !ws || ws.readyState !== WebSocket.OPEN) {
       notice('Panel desconectado: no se ha enviado nada', 'error');
       return;
@@ -148,7 +183,7 @@
     const id = crypto.randomUUID();
     pending.add(id);
     setConnection(`OCUPADO ${pending.size}`);
-    ws.send(JSON.stringify({type: 'command', action, command_id: id}));
+    ws.send(JSON.stringify({type: 'command', action, symbol, command_id: id}));
   }
 
   function connect() {
