@@ -143,9 +143,9 @@ class Terminal:
     async def status(self):
         state = await self.snapshot()
         p = state["position"]
-        text = f"{SYMBOL} {state['bid']:,.1f}/{state['ask']:,.1f} · equity ${state['equity']:,.2f} · "
+        text = f"{SYMBOL} {state['bid']:,.4f}/{state['ask']:,.4f} · equity ${state['equity']:,.2f} · "
         if p:
-            text += (f"posición {p['side']} {p['size']} BTC · entry {p['entry']} · "
+            text += (f"posición {p['side']} {p['size']} {SYMBOL} · entry {p['entry']} · "
                      f"PnL {p['pnl']} · liq {p['liquidation']}")
         else:
             text += "sin posición"
@@ -188,14 +188,14 @@ class Terminal:
             self.log(message)
             return {"ok": False, "message": message}
         if not reduce_only and (btc < self.market.min_base or btc * ask < self.market.min_quote):
-            message = f"Bajo el mínimo del exchange ({self.market.min_base} BTC / {self.market.min_quote} USD)"
+            message = f"Bajo el mínimo del exchange ({self.market.min_base} {SYMBOL} / {self.market.min_quote} USD)"
             self.log(message)
             return {"ok": False, "message": message}
         if DRY_RUN:
             fill = bid if is_ask else ask
             actual_btc = base_amount / 10 ** self.market.size_decimals
             self.update_paper(actual_btc, is_ask, reduce_only, fill)
-            message = f"[SIM] {side} {actual_btc:.6f} {SYMBOL} · peor precio {worst:,.1f} · reduce_only={reduce_only}"
+            message = f"[SIM] {side} {actual_btc:.6f} {SYMBOL} · peor precio {worst:,.4f} · reduce_only={reduce_only}"
             self.log(message)
             result = {"ok": True, "message": message, "simulated": True, "tx_hash": None}
         else:
@@ -239,7 +239,7 @@ class Terminal:
         worst = trigger * (1 - SLIPPAGE if long else 1 + SLIPPAGE)
         if DRY_RUN:
             self.paper_stop = trigger
-            self.log(f"[SIM] stop {'LONG' if long else 'SHORT'} @ {trigger:,.1f} ({STOP_PCT * 100}% del entry)")
+            self.log(f"[SIM] stop {'LONG' if long else 'SHORT'} @ {trigger:,.4f} ({STOP_PCT * 100}% del entry)")
             return True
         global COI
         COI += 1
@@ -255,7 +255,7 @@ class Terminal:
         if err:
             self.log(f"ERROR al poner el stop: {err}")
             return False
-        self.log(f"Stop-loss puesto @ {trigger:,.1f} ({STOP_PCT * 100}% del entry {entry:,.1f})")
+        self.log(f"Stop-loss puesto @ {trigger:,.4f} ({STOP_PCT * 100}% del entry {entry:,.4f})")
         return True
 
     async def open(self, is_ask):

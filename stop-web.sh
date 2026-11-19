@@ -12,7 +12,7 @@ cmdline=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
 process_dir=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
 if [[ "$process_dir" == "$PWD" && "$cmdline" == *"web.py"* ]] && kill -0 "$pid" 2>/dev/null; then
     kill -TERM "$pid"
-    for _ in $(seq 1 50); do
+    for _ in $(seq 1 100); do
         kill -0 "$pid" 2>/dev/null || break
         sleep 0.1
     done

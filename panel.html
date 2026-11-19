@@ -87,7 +87,7 @@
 (() => {
   const token = location.hash.slice(1);
   const $ = id => document.getElementById(id);
-  const money = new Intl.NumberFormat('en-US', {maximumFractionDigits: 1});
+  const money = new Intl.NumberFormat('en-US', {maximumFractionDigits: 4});
   let ws;
   let authenticated = false;
   let reconnectTimer;
