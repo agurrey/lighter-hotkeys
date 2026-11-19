@@ -1,6 +1,6 @@
 # lighter-hotkeys
 
-A minimal, keyboard-only trading terminal for [Lighter](https://lighter.xyz) perpetuals. One Python file, no UI framework, no browser extension. Press a key in your terminal, a signed market order goes to Lighter. Your positions show up in the normal Lighter web app, so you can watch charts there and trade from the terminal.
+A minimal, keyboard-only trading panel for [Lighter](https://lighter.xyz) perpetuals. A local Python process signs the orders; your positions show up in the normal Lighter web app. Use the lightweight localhost panel next to your charts, or the original terminal UI. No browser extension, frontend framework or build step.
 
 Defaults are meant for BTC perp, but the symbol, leverage, size and stop are configurable.
 
@@ -11,11 +11,11 @@ Defaults are meant for BTC perp, but the symbol, leverage, size and stop are con
 | `Q` | Market buy / long |
 | `W` | Market sell / short |
 | `E` | Close the whole position (reduce-only) |
-| `Ctrl+C` | Quit (positions stay open on Lighter) |
+| `Ctrl+C` | Quit the CLI (positions stay open on Lighter) |
 
-By default, every entry gets a **native hard stop-loss** 0.3% from your fill price. It lives on the exchange, protects you even if you close the terminal or lose internet, and is cancelled automatically when the position closes or flips. Set `STOP_PCT=0` to disable it or choose another distance. A stop triggers a market order with the configured slippage cap, so execution is not guaranteed during an extreme gap or crash.
+The panel shows **ACTIVO** in green when it has keyboard focus and **PAUSADO** in grey when it does not. Paused only means that hotkeys cannot fire: position updates and the native stop remain active. Keep Lighter visible beside the panel and focus the panel once; there are no global hotkeys and no keylogging.
 
-The terminal needs keyboard focus: Alt+Tab to it (or click it once), then trade. No global keylogging, no mouse.
+By default, every entry gets a **native hard stop-loss** 0.3% from your fill price. It lives on the exchange, protects you even if you close the panel or lose internet, and is cancelled automatically when the position closes or flips. Set `STOP_PCT=0` to disable it or choose another distance. A stop triggers a market order with the configured slippage cap, so execution is not guaranteed during an extreme gap or crash.
 
 ## Install
 
@@ -30,26 +30,46 @@ chmod 600 .env
 
 ## Configure (`.env`)
 
-- `DRY_RUN=1` simulates orders with live prices and no keys — try this first.
+- `DRY_RUN=1` simulates positions, stops and closes with live prices and no keys — try this first.
 - `TESTNET=1` uses Lighter testnet (needs its own account and API key).
 - `SYMBOL=BTC`, `LEVERAGE=50` (set on your account at startup, cross margin).
 - `MARGIN_PCT=10`: each entry uses 10% of your portfolio as margin. At 50x that is a position of 5x your equity — know your risk.
 - `SLIPPAGE_PCT=0.3`: worst acceptable price on market orders.
 - `STOP_PCT=0.3`: native hard stop at 0.3% from entry by default. Set `0` to disable it.
+- `WEB_PORT=8787`: loopback port for the panel.
 - `ACCOUNT_INDEX`, `API_KEY_INDEX`, `API_PRIVATE_KEY`: only needed with `DRY_RUN=0`. Create a **dedicated API key index** at https://app.lighter.xyz/apikeys (not the one the web app uses). Never share the private key; it never leaves your machine except as local order signatures.
 
-## Run
+## Local web panel
+
+```bash
+./start-web.sh    # starts in the background and opens the panel
+./stop-web.sh     # stops only the local server; positions/stops stay untouched
+```
+
+The page is served only on `127.0.0.1`, with a random session token in the URL fragment and strict WebSocket origin checks. The token never reaches Lighter. API keys, account indexes and order parameters stay in Python; the browser can only request `long`, `short` or `close`. Only one controlling tab is allowed. Commands are executed sequentially, key auto-repeat is ignored, cached command IDs prevent duplicate execution and reconnects never resend pending commands.
+
+Optional aliases:
+
+```bash
+alias btc-web='cd ~/lighter-hotkeys && ./start-web.sh'
+alias btc-web-stop='cd ~/lighter-hotkeys && ./stop-web.sh'
+```
+
+Runtime files (`.web.url`, `.web.pid`, `.web.log`) are local and gitignored. If the server restarts, open a fresh URL with `start-web.sh`; an old tab cannot trade with an expired session token.
+
+## Terminal UI
 
 ```bash
 .venv/bin/python hotkeys.py
 ```
 
-Optional alias in `~/.bashrc`: `alias btc='cd ~/lighter-hotkeys && .venv/bin/python hotkeys.py'`
+Optional alias: `alias btc='cd ~/lighter-hotkeys && .venv/bin/python hotkeys.py'`
 
 ## Safety notes
 
 - Market orders are aggressive IOC limits with a worst-price cap (`SLIPPAGE_PCT`).
 - Closes are always reduce-only, so a close can never open an opposite position.
+- The web server must stay bound to `127.0.0.1`; do not expose it through a LAN address, reverse proxy or tunnel.
 - An API key can trade and withdraw only to your own wallet, never to third parties. Still: dedicated key, small size first, test with `DRY_RUN=1`.
 - This is a personal tool shared as-is, not financial advice. You are responsible for your orders.
 

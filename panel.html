@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lighter Hotkeys</title>
+  <style>
+    :root { color-scheme: dark; --bg:#090b10; --card:#11151d; --line:#252b37; --muted:#8a93a5; --green:#41d99a; --red:#ff6577; --amber:#f2c66d; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:#edf1f7; font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    main { width:min(100%,520px); margin:auto; padding:20px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:18px; }
+    h1 { font-size:16px; letter-spacing:.08em; margin:0; }
+    .badges { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+    .badge { padding:4px 8px; border:1px solid var(--line); border-radius:5px; color:var(--muted); font-size:11px; font-weight:700; }
+    #focus.active { color:var(--green); border-color:#24664e; background:#10291f; }
+    #focus.paused { color:var(--muted); background:#151922; }
+    #connection.error { color:var(--red); }
+    #mode.sim { color:var(--amber); }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:9px; padding:14px; margin-bottom:12px; }
+    .market { display:flex; justify-content:space-between; gap:12px; }
+    .label { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+    .value { font-size:17px; margin-top:3px; }
+    .muted { color:var(--muted); }
+    .positive { color:var(--green); }
+    .negative { color:var(--red); }
+    .keys { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+    button { font:inherit; color:inherit; background:#171d28; border:1px solid var(--line); border-radius:7px; padding:13px 5px; cursor:pointer; }
+    button:hover { border-color:#59667d; }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    button b { display:block; font-size:22px; margin-bottom:3px; }
+    button small { color:var(--muted); }
+    #long b { color:var(--green); }
+    #short b { color:var(--red); }
+    #close b { color:var(--amber); }
+    #position { white-space:pre-line; }
+    #notice { min-height:22px; margin:10px 0; color:var(--muted); }
+    #notice.ok { color:var(--green); }
+    #notice.error { color:var(--red); }
+    #notice.warning { color:var(--amber); }
+    #logs { margin:8px 0 0; padding:0; list-style:none; color:var(--muted); font-size:11px; }
+    #logs li { padding:5px 0; border-bottom:1px solid #1b202a; overflow-wrap:anywhere; }
+    footer { color:var(--muted); font-size:11px; margin-top:14px; }
+    @media (max-width:380px) { main { padding:12px; } .value { font-size:14px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>LIGHTER // <span id="symbol">BTC</span></h1>
+    <div class="badges">
+      <span id="mode" class="badge">CARGANDO</span>
+      <span id="connection" class="badge">CONECTANDO</span>
+      <span id="focus" class="badge paused">PAUSADO</span>
+    </div>
+  </header>
+
+  <section class="card market">
+    <div><div class="label">Bid / Ask</div><div id="price" class="value">—</div></div>
+    <div><div class="label">Equity</div><div id="equity" class="value">—</div></div>
+  </section>
+
+  <section class="card">
+    <div class="label">Posición</div>
+    <div id="position" class="value">Sin posición</div>
+    <div id="stop" class="muted">—</div>
+  </section>
+
+  <section class="keys">
+    <button id="long" data-action="long"><b>Q</b><small>LONG</small></button>
+    <button id="short" data-action="short"><b>W</b><small>SHORT</small></button>
+    <button id="close" data-action="close"><b>E</b><small>CERRAR</small></button>
+  </section>
+
+  <div id="notice" role="status" aria-live="polite"></div>
+
+  <section class="card">
+    <div class="label">Actividad</div>
+    <ul id="logs"></ul>
+  </section>
+
+  <footer>Las teclas solo actúan con este panel enfocado.<br>Cerrar el panel no cierra posiciones ni cancela el stop nativo.</footer>
+</main>
+<script>
+(() => {
+  const token = location.hash.slice(1);
+  const $ = id => document.getElementById(id);
+  const money = new Intl.NumberFormat('en-US', {maximumFractionDigits: 1});
+  let ws;
+  let authenticated = false;
+  let reconnectTimer;
+  const pending = new Set();
+
+  function updateFocus() {
+    const active = document.hasFocus() && !document.hidden;
+    $('focus').textContent = active ? 'ACTIVO' : 'PAUSADO';
+    $('focus').className = `badge ${active ? 'active' : 'paused'}`;
+  }
+
+  function setConnection(text, error = false) {
+    $('connection').textContent = text;
+    $('connection').className = `badge${error ? ' error' : ''}`;
+    document.querySelectorAll('button[data-action]').forEach(button => {
+      button.disabled = !authenticated;
+    });
+  }
+
+  function notice(text, kind = '') {
+    $('notice').textContent = text;
+    $('notice').className = kind;
+  }
+
+  function addLog(message) {
+    const item = document.createElement('li');
+    item.textContent = `${new Date().toLocaleTimeString('es-ES')} · ${message}`;
+    $('logs').prepend(item);
+    while ($('logs').children.length > 8) $('logs').lastChild.remove();
+  }
+
+  function render(state) {
+    $('symbol').textContent = state.symbol;
+    $('mode').textContent = state.dry_run ? 'SIMULACIÓN' : (state.testnet ? 'TESTNET' : 'MAINNET');
+    $('mode').className = `badge${state.dry_run ? ' sim' : ''}`;
+    $('price').textContent = `${money.format(state.bid)} / ${money.format(state.ask)}`;
+    $('equity').textContent = `$${money.format(state.equity)}`;
+    const p = state.position;
+    if (!p) {
+      $('position').textContent = 'Sin posición';
+      $('position').className = 'value muted';
+    } else {
+      const liquidation = p.liquidation > 0 ? `\nLiq ${money.format(p.liquidation)}` : '';
+      $('position').textContent = `${p.side} ${p.size} ${state.symbol}\nEntry ${money.format(p.entry)} · PnL ${p.pnl >= 0 ? '+' : ''}${money.format(p.pnl)}${liquidation}`;
+      $('position').className = `value ${p.pnl >= 0 ? 'positive' : 'negative'}`;
+    }
+    const stop = state.paper_stop ? `Stop simulado @ ${money.format(state.paper_stop)}` : `Hard stop ${state.stop_pct}% · ${state.leverage}x · ${state.margin_pct}% margen`;
+    $('stop').textContent = stop;
+  }
+
+  function send(action) {
+    if (!authenticated || !ws || ws.readyState !== WebSocket.OPEN) {
+      notice('Panel desconectado: no se ha enviado nada', 'error');
+      return;
+    }
+    const id = crypto.randomUUID();
+    pending.add(id);
+    setConnection(`OCUPADO ${pending.size}`);
+    ws.send(JSON.stringify({type: 'command', action, command_id: id}));
+  }
+
+  function connect() {
+    if (!token) {
+      setConnection('FALTA TOKEN', true);
+      notice('Abre el panel desde ./start-web.sh', 'error');
+      return;
+    }
+    authenticated = false;
+    setConnection('CONECTANDO');
+    ws = new WebSocket(`ws://${location.host}/ws`);
+    ws.onopen = () => ws.send(JSON.stringify({type: 'auth', token}));
+    ws.onmessage = event => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'hello') {
+        authenticated = true;
+        setConnection('CONECTADO');
+        if (pending.size) {
+          pending.clear();
+          notice('Reconectado. Los comandos pendientes no se reenviaron.', 'warning');
+        }
+      } else if (message.type === 'logs') {
+        $('logs').replaceChildren();
+        message.messages.forEach(addLog);
+      } else if (message.type === 'state') {
+        render(message.state);
+      } else if (message.type === 'log') {
+        addLog(message.message);
+      } else if (message.type === 'result') {
+        pending.delete(message.command_id);
+        setConnection(pending.size ? `OCUPADO ${pending.size}` : 'CONECTADO');
+        notice(message.warning || message.message, message.warning ? 'warning' : (message.ok ? 'ok' : 'error'));
+      } else if (message.type === 'error') {
+        notice(message.message, 'error');
+      }
+    };
+    ws.onclose = event => {
+      authenticated = false;
+      setConnection('DESCONECTADO', true);
+      if (event.code === 4001 || event.code === 4003) {
+        notice(event.reason || 'Sesión no autorizada', 'error');
+        return;
+      }
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(connect, 1500);
+    };
+    ws.onerror = () => setConnection('ERROR DE CONEXIÓN', true);
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+    const target = event.target;
+    if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+    const actions = {KeyQ: 'long', KeyW: 'short', KeyE: 'close'};
+    const action = actions[event.code];
+    if (!action || !document.hasFocus() || document.hidden) return;
+    event.preventDefault();
+    send(action);
+  });
+  document.querySelectorAll('button[data-action]').forEach(button => {
+    button.addEventListener('click', () => send(button.dataset.action));
+  });
+  window.addEventListener('focus', updateFocus);
+  window.addEventListener('blur', updateFocus);
+  document.addEventListener('visibilitychange', updateFocus);
+  updateFocus();
+  connect();
+})();
+</script>
+</body>
+</html>
