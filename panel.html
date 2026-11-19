@@ -7,7 +7,9 @@
   <style>
     :root { color-scheme: dark; --bg:#090b10; --card:#11151d; --line:#252b37; --muted:#8a93a5; --green:#41d99a; --red:#ff6577; --amber:#f2c66d; }
     * { box-sizing:border-box; }
-    body { margin:0; background:var(--bg); color:#edf1f7; font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    body { margin:0; background:#450a12; color:#edf1f7; font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; transition:background 120ms ease-out; }
+    body.focus-active { background:#064e2b; }
+    body.focus-paused { background:#450a12; }
     main { width:min(100%,520px); margin:auto; padding:20px; }
     header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:18px; }
     h1 { font-size:16px; letter-spacing:.08em; margin:0; }
@@ -95,6 +97,8 @@
     const active = document.hasFocus() && !document.hidden;
     $('focus').textContent = active ? 'ACTIVO' : 'PAUSADO';
     $('focus').className = `badge ${active ? 'active' : 'paused'}`;
+    document.body.classList.toggle('focus-active', active);
+    document.body.classList.toggle('focus-paused', !active);
   }
 
   function setConnection(text, error = false) {
