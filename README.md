@@ -10,6 +10,7 @@ Defaults are meant for BTC perp, but the symbol, leverage, size and stop are con
 |---|---|
 | `Q` | Market buy / long |
 | `W` | Market sell / short |
+| `1` | Close 30% of the position (reduce-only) |
 | `E` | Close the whole position (reduce-only) |
 | `Ctrl+C` | Quit the CLI (positions stay open on Lighter) |
 

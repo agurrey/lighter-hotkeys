@@ -97,7 +97,7 @@ class LocalPanel:
         cached = self.cached_result(command_id)
         if cached:
             return cached
-        if action not in {"long", "short", "close"}:
+        if action not in {"long", "short", "close30", "close"}:
             return {"type": "error", "message": "Acción no permitida"}
         async with self.command_lock:
             cached = self.cached_result(command_id)
@@ -108,6 +108,8 @@ class LocalPanel:
                     outcome = await self.terminal.open(is_ask=False)
                 elif action == "short":
                     outcome = await self.terminal.open(is_ask=True)
+                elif action == "close30":
+                    outcome = await self.terminal.close(fraction=0.3)
                 else:
                     outcome = await self.terminal.close()
             except Exception as error:

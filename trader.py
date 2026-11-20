@@ -78,7 +78,7 @@ class Terminal:
         self.log(f"{'TESTNET' if TESTNET else 'MAINNET'} · {SYMBOL} market_id={self.market.id} · "
                  f"{'DRY-RUN (simulado)' if DRY_RUN else f'{LEVERAGE}x · {MARGIN_PCT}% margen por entrada'}")
         stop = f"stop duro {STOP_PCT * 100:g}%" if STOP_PCT else "sin stop"
-        self.log(f"Q compra · W vende · E cierra · {stop} · Ctrl+C sale")
+        self.log(f"Q compra · W vende · 1 cierra 30% · E cierra todo · {stop} · Ctrl+C sale")
 
     async def shutdown(self):
         if self.api:
@@ -271,7 +271,7 @@ class Terminal:
                  f"x{LEVERAGE} = {btc:.6f} {SYMBOL}")
         return await self.send(btc, is_ask, reduce_only=False)
 
-    async def close(self):
+    async def close(self, fraction=1.0):
         _, pos = await self.account()
         if not pos:
             message = "No hay posición que cerrar"
@@ -279,4 +279,8 @@ class Terminal:
             return {"ok": True, "message": message, "unchanged": True}
         p = pos[0]
         size = float(p.position) * (1 if p.sign >= 0 else -1)
-        return await self.send(abs(size), is_ask=size > 0, reduce_only=True)
+        amount = abs(size)
+        if fraction < 1:
+            units = 10 ** self.market.size_decimals
+            amount = int(amount * fraction * units) / units
+        return await self.send(amount, is_ask=size > 0, reduce_only=True)
