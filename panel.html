@@ -28,15 +28,15 @@
     #stop { margin-top:6px; font-size:12px; }
     [hidden] { display:none !important; }
     .stats { display:flex; justify-content:space-between; gap:8px; margin-top:10px; font-size:12px; }
-    .keys { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-    button { font:inherit; color:inherit; background:#171d28; border:1px solid var(--line); border-radius:7px; padding:14px 3px; cursor:pointer; }
+    .keys { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    button { font:inherit; color:inherit; background:#171d28; border:1px solid var(--line); border-radius:7px; padding:14px 5px; cursor:pointer; }
     button:hover { border-color:#59667d; }
     button:disabled { opacity:.45; cursor:not-allowed; }
     button b { display:block; font-size:22px; margin-bottom:3px; }
     button small { color:var(--muted); }
     #long b { color:var(--green); }
     #short b { color:var(--red); }
-    #close30 b, #close b { color:var(--amber); }
+    #close b { color:var(--amber); }
     #notice { min-height:22px; margin:12px 2px 0; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
     #notice.ok { color:var(--green); }
     #notice.error { color:var(--red); }
@@ -73,7 +73,6 @@
   <section class="keys">
     <button id="long" data-action="long"><b>Q</b><small>LONG</small></button>
     <button id="short" data-action="short"><b>W</b><small>SHORT</small></button>
-    <button id="close30" data-action="close30"><b>1</b><small>CERRAR 30%</small></button>
     <button id="close" data-action="close"><b>E</b><small>CERRAR</small></button>
   </section>
 
@@ -206,7 +205,7 @@
       } else if (message.type === 'result') {
         pending.delete(message.command_id);
         setConnection(pending.size ? `OCUPADO ${pending.size}` : 'CONECTADO');
-        const labels = {long:'LONG OK', short:'SHORT OK', close30:'30% CERRADO', close:'CIERRE OK'};
+        const labels = {long:'LONG OK', short:'SHORT OK', close:'CIERRE OK'};
         const text = message.unchanged ? 'Nada que cerrar' : (labels[message.action] || message.message);
         notice(message.warning || (message.ok ? text : message.message), message.warning ? 'warning' : (message.ok ? 'ok' : 'error'));
       } else if (message.type === 'error') {
@@ -230,7 +229,7 @@
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     const target = event.target;
     if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
-    const actions = {KeyQ:'long', KeyW:'short', Digit1:'close30', Numpad1:'close30', KeyE:'close'};
+    const actions = {KeyQ:'long', KeyW:'short', KeyE:'close'};
     const action = actions[event.code];
     if (!action || !document.hasFocus() || document.hidden) return;
     event.preventDefault();

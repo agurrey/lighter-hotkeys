@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Terminal de hotkeys para Lighter. Q compra, W vende, 1 cierra 30% y E cierra toda la posición."""
+"""Terminal de hotkeys para Lighter. Q compra, W vende, E cierra toda la posición."""
 import asyncio
 import sys
 
@@ -48,8 +48,6 @@ async def run():
                         await terminal.open(is_ask=False)
                     elif ch == "w":
                         await terminal.open(is_ask=True)
-                    elif ch == "1":
-                        await terminal.close(fraction=0.3)
                     elif ch == "e":
                         await terminal.close()
                 except Exception as e:
