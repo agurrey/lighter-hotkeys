@@ -6,6 +6,8 @@ from types import SimpleNamespace
 
 import lighter
 
+from session import SessionTracker
+
 BASE = Path(__file__).resolve().parent
 ENV = BASE / ".env"
 if ENV.exists():
@@ -41,8 +43,10 @@ class Terminal:
         self.log = logger or log
         self.paper = None
         self.paper_stop = None
+        self.paper_realized = 0.0
         self.last_bid = None
         self.last_ask = None
+        self.session = SessionTracker(LEVERAGE)
 
     async def start(self):
         self.api = lighter.ApiClient(configuration=lighter.Configuration(host=URL))
@@ -108,6 +112,7 @@ class Terminal:
             sign=1 if size > 0 else -1,
             avg_entry_price=str(self.paper["entry"]),
             unrealized_pnl=str(pnl),
+            realized_pnl=str(self.paper_realized),
             liquidation_price="0",
         )
         return 1000.0, [pos]
@@ -130,12 +135,16 @@ class Terminal:
                 "pnl_pct": pnl / margin * 100 if margin else 0.0,
                 "liquidation": float(p.liquidation_price),
             }
+        realized_total = float(p.realized_pnl) if p else (self.paper_realized if DRY_RUN else None)
+        session = self.session.update(equity, position, realized_total)
         return {
             "symbol": SYMBOL,
             "bid": bid,
             "ask": ask,
             "equity": equity,
             "position": position,
+            "trade": session["trade"],
+            "session": session["session"],
             "dry_run": DRY_RUN,
             "testnet": TESTNET,
             "leverage": LEVERAGE,
@@ -165,6 +174,9 @@ class Terminal:
         signed = -btc if is_ask else btc
         old = self.paper["size"] if self.paper else 0.0
         old_entry = self.paper["entry"] if self.paper else 0.0
+        if old and old * signed < 0:
+            closed = min(abs(old), abs(signed))
+            self.paper_realized += (fill - old_entry) * closed * (1 if old > 0 else -1)
         new = old + signed
         if reduce_only and old * new < 0:
             new = 0.0

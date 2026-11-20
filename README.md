@@ -16,6 +16,8 @@ Defaults are meant for BTC perp, but the symbol, leverage, size and stop are con
 
 The panel is intentionally minimal: selected side and size, PnL as a percentage of the position's initial margin (ROE), stop/leverage, connection and one short action confirmation. It shows **ACTIVO** in green when it has keyboard focus and **PAUSADO** in grey when it does not; the whole background also turns green or red. Paused only means that hotkeys cannot fire: position updates and the native stop remain active. Keep Lighter visible beside the panel and focus the panel once; there are no global hotkeys and no keylogging.
 
+During a trade, **Queda** shows the actual remaining size as a percentage of the initial position and **Realizado** shows realized ROE on the original margin. The bottom log keeps the last 10 closed trades; **Sesión** is their realized return on the equity measured when the local server started. Closing or refreshing the browser preserves the session; restarting the server starts a new one. Partial closes use Lighter's `realized_pnl`. Since a flat market position disappears from the account response and the transaction-history endpoint is unavailable, the final tranche uses the last available position valuation, so the final logged result can differ slightly from the exact fill and fees.
+
 By default, every entry gets a **native hard stop-loss** 0.3% from your fill price. It lives on the exchange, protects you even if you close the panel or lose internet, and is cancelled automatically when the position closes or flips. Set `STOP_PCT=0` to disable it or choose another distance. A stop triggers a market order with the configured slippage cap, so execution is not guaranteed during an extreme gap or crash.
 
 ## Install

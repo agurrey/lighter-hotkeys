@@ -26,6 +26,8 @@
     .positive { color:var(--green); }
     .negative { color:var(--red); }
     #stop { margin-top:6px; font-size:12px; }
+    [hidden] { display:none !important; }
+    .stats { display:flex; justify-content:space-between; gap:8px; margin-top:10px; font-size:12px; }
     .keys { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
     button { font:inherit; color:inherit; background:#171d28; border:1px solid var(--line); border-radius:7px; padding:14px 3px; cursor:pointer; }
     button:hover { border-color:#59667d; }
@@ -39,6 +41,11 @@
     #notice.ok { color:var(--green); }
     #notice.error { color:var(--red); }
     #notice.warning { color:var(--amber); }
+    .session-card { padding:12px 14px; }
+    .session-head, .history-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    #session-total { font-size:12px; font-weight:700; }
+    .history { margin-top:8px; font-size:11px; }
+    .history-row { padding:3px 0; }
     @media (max-width:380px) { main { padding:12px; } .value { font-size:15px; } }
   </style>
 </head>
@@ -56,6 +63,10 @@
   <section class="card">
     <div class="label">Posición</div>
     <div id="position" class="value muted">Sin posición</div>
+    <div id="trade-stats" class="stats" hidden>
+      <span id="remaining" class="muted">Queda 100%</span>
+      <span id="realized" class="muted">Realizado +0%</span>
+    </div>
     <div id="stop" class="muted">SL 0.3% · 50x</div>
   </section>
 
@@ -67,6 +78,14 @@
   </section>
 
   <div id="notice" role="status" aria-live="polite"></div>
+
+  <section class="card session-card">
+    <div class="session-head">
+      <span class="label">Operaciones</span>
+      <span id="session-total" class="muted">Sesión +0.00%</span>
+    </div>
+    <div id="history" class="history"><div class="muted">Sin operaciones cerradas</div></div>
+  </section>
 </main>
 <script>
 (() => {
@@ -100,6 +119,10 @@
     $('notice').className = kind;
   }
 
+  function signedPct(value) {
+    return `${value >= 0 ? '+' : ''}${pnlFormat.format(value)}%`;
+  }
+
   function render(state) {
     $('symbol').textContent = state.symbol;
     $('mode').textContent = state.dry_run ? 'SIMULACIÓN' : (state.testnet ? 'TESTNET' : 'MAINNET');
@@ -109,11 +132,43 @@
       $('position').textContent = 'Sin posición';
       $('position').className = 'value muted';
     } else {
-      const pnlPct = `${p.pnl_pct >= 0 ? '+' : ''}${pnlFormat.format(p.pnl_pct)}%`;
-      $('position').textContent = `${p.side} ${p.size} ${state.symbol} · PnL ${pnlPct}`;
+      $('position').textContent = `${p.side} ${p.size} ${state.symbol} · PnL ${signedPct(p.pnl_pct)}`;
       $('position').className = `value ${p.pnl >= 0 ? 'positive' : 'negative'}`;
     }
     $('stop').textContent = state.paper_stop ? `SL simulado @ ${priceFormat.format(state.paper_stop)}` : `SL ${state.stop_pct}% · ${state.leverage}x`;
+
+    const trade = state.trade;
+    $('trade-stats').hidden = !trade;
+    if (trade) {
+      $('remaining').textContent = `Queda ${pnlFormat.format(trade.remaining_pct)}%`;
+      $('realized').textContent = `Realizado ${signedPct(trade.realized_pct)}`;
+      $('realized').className = trade.realized_pct >= 0 ? 'positive' : 'negative';
+    }
+
+    const session = state.session;
+    $('session-total').textContent = `Sesión ${signedPct(session.total_pct)}`;
+    $('session-total').className = session.total_pct >= 0 ? 'positive' : 'negative';
+    const history = $('history');
+    history.replaceChildren();
+    if (!session.trades.length) {
+      const empty = document.createElement('div');
+      empty.className = 'muted';
+      empty.textContent = 'Sin operaciones cerradas';
+      history.appendChild(empty);
+    } else {
+      session.trades.forEach(trade => {
+        const row = document.createElement('div');
+        row.className = 'history-row';
+        const description = document.createElement('span');
+        description.className = 'muted';
+        description.textContent = `${trade.time} ${trade.side}`;
+        const result = document.createElement('span');
+        result.className = trade.pnl_pct >= 0 ? 'positive' : 'negative';
+        result.textContent = signedPct(trade.pnl_pct);
+        row.append(description, result);
+        history.appendChild(row);
+      });
+    }
   }
 
   function send(action) {
