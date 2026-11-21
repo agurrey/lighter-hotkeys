@@ -12,7 +12,9 @@
     body.focus-paused { background:#450a12; }
     main { width:min(100%,420px); margin:auto; padding:20px; }
     header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px; }
-    h1 { font-size:14px; letter-spacing:.06em; margin:0; white-space:nowrap; }
+    h1 { display:flex; align-items:center; gap:6px; font-size:14px; letter-spacing:.06em; margin:0; white-space:nowrap; }
+    #symbol { font:inherit; font-weight:700; color:#edf1f7; background:#171d28; border:1px solid var(--line); border-radius:5px; padding:4px 6px; cursor:pointer; }
+    #symbol:disabled { opacity:.45; cursor:not-allowed; }
     .badges { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:4px; }
     .badge { padding:4px 6px; border:1px solid var(--line); border-radius:5px; color:var(--muted); font-size:10px; font-weight:700; }
     #focus.active { color:var(--green); border-color:#24664e; background:#10291f; }
@@ -52,7 +54,7 @@
 <body>
 <main>
   <header>
-    <h1>LIGHTER // <span id="symbol">BTC</span></h1>
+    <h1>LIGHTER // <select id="symbol" aria-label="Mercado"></select></h1>
     <div class="badges">
       <span id="mode" class="badge">CARGANDO</span>
       <span id="connection" class="badge">CONECTANDO</span>
@@ -95,6 +97,7 @@
   let ws;
   let authenticated = false;
   let reconnectTimer;
+  let currentSymbol = null;
   const pending = new Set();
 
   function updateFocus() {
@@ -111,6 +114,7 @@
     document.querySelectorAll('button[data-action]').forEach(button => {
       button.disabled = !authenticated;
     });
+    $('symbol').disabled = !authenticated || pending.size > 0;
   }
 
   function notice(text, kind = '') {
@@ -122,8 +126,27 @@
     return `${value >= 0 ? '+' : ''}${pnlFormat.format(value)}%`;
   }
 
+  function renderMarkets(markets, selected) {
+    const selector = $('symbol');
+    const signature = markets.map(market => `${market.symbol}:${market.leverage}:${market.stop_pct}`).join('|');
+    if (selector.dataset.signature !== signature) {
+      selector.dataset.signature = signature;
+      selector.replaceChildren();
+      markets.forEach(market => {
+        const option = document.createElement('option');
+        option.value = market.symbol;
+        option.textContent = `${market.symbol} · ${market.leverage}x · SL ${market.stop_pct}%`;
+        selector.appendChild(option);
+      });
+    }
+    selector.value = selected;
+    selector.disabled = !authenticated || pending.size > 0;
+  }
+
   function render(state) {
-    $('symbol').textContent = state.symbol;
+    currentSymbol = state.symbol;
+    document.title = `${state.symbol} · Lighter Hotkeys`;
+    renderMarkets(state.markets, state.symbol);
     $('mode').textContent = state.dry_run ? 'SIMULACIÓN' : (state.testnet ? 'TESTNET' : 'MAINNET');
     $('mode').className = `badge${state.dry_run ? ' sim' : ''}`;
     const p = state.position;
@@ -170,7 +193,7 @@
     }
   }
 
-  function send(action) {
+  function send(action, symbol = currentSymbol) {
     if (!authenticated || !ws || ws.readyState !== WebSocket.OPEN) {
       notice('Panel desconectado', 'error');
       return;
@@ -178,7 +201,7 @@
     const id = crypto.randomUUID();
     pending.add(id);
     setConnection(`OCUPADO ${pending.size}`);
-    ws.send(JSON.stringify({type:'command', action, command_id:id}));
+    ws.send(JSON.stringify({type:'command', action, symbol, command_id:id}));
   }
 
   function connect() {
@@ -238,6 +261,7 @@
   document.querySelectorAll('button[data-action]').forEach(button => {
     button.addEventListener('click', () => send(button.dataset.action));
   });
+  $('symbol').addEventListener('change', () => send('select', $('symbol').value));
   window.addEventListener('focus', updateFocus);
   window.addEventListener('blur', updateFocus);
   document.addEventListener('visibilitychange', updateFocus);
