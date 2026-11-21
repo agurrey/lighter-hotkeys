@@ -2,7 +2,7 @@
 
 A minimal, keyboard-only trading panel for [Lighter](https://lighter.xyz) perpetuals. A local Python process signs the orders; your positions show up in the normal Lighter web app. Use the lightweight localhost panel next to your charts, or the original terminal UI. No browser extension, frontend framework or build step.
 
-The dropdown switches between BTC (50x, 0.3% stop) and LIT (5x, 1% stop). The selected market, leverage, size and stops are configurable. Each market keeps its own position tracking and session log.
+The dropdown switches between BTC (50x, 0.3% stop), LIT (5x, 1% stop) and HYPE (20x, 0.75% stop). The selected market, leverage, size and stops are configurable. Each market keeps its own position tracking and session log.
 
 ## Keys
 
@@ -17,7 +17,7 @@ The panel is intentionally minimal: selected side and size, PnL as a percentage 
 
 During a trade, **Queda** shows the actual remaining size as a percentage of the initial position and **Realizado** shows realized ROE on the original margin. The bottom log keeps the last 10 closed trades; **Sesión** is their realized return on the equity measured when the local server started. Closing or refreshing the browser preserves the session; restarting the server starts a new one. Partial closes use Lighter's `realized_pnl`. Since a flat market position disappears from the account response and the transaction-history endpoint is unavailable, the final tranche uses the last available position valuation, so the final logged result can differ slightly from the exact fill and fees.
 
-By default, every BTC entry gets a **native hard stop-loss** 0.3% from your fill price; LIT uses 1%. It lives on the exchange, protects you even if you close the panel or lose internet, and is cancelled automatically when the position closes or flips. Set the market's stop to `0` to disable it or choose another distance. A stop triggers a market order with the configured slippage cap, so execution is not guaranteed during an extreme gap or crash.
+By default, every BTC entry gets a **native hard stop-loss** 0.3% from your fill price; LIT uses 1% and HYPE 0.75%. It lives on the exchange, protects you even if you close the panel or lose internet, and is cancelled automatically when the position closes or flips. Set the market's stop to `0` to disable it or choose another distance. A stop triggers a market order with the configured slippage cap, so execution is not guaranteed during an extreme gap or crash.
 
 ## Install
 
@@ -34,11 +34,11 @@ chmod 600 .env
 
 - `DRY_RUN=1` simulates positions, stops and closes with live prices and no keys — try this first.
 - `TESTNET=1` uses Lighter testnet (needs its own account and API key).
-- `SYMBOL=BTC`, `SYMBOLS=BTC,LIT`: initial market and dropdown markets.
-- `LEVERAGE=50`, `LIT_LEVERAGE=5`: cross leverage set when each market is selected.
+- `SYMBOL=BTC`, `SYMBOLS=BTC,LIT,HYPE`: initial market and dropdown markets.
+- `LEVERAGE=50`, `LIT_LEVERAGE=5`, `HYPE_LEVERAGE=20`: cross leverage set when each market is selected. HYPE currently has a 20x maximum.
 - `MARGIN_PCT=10`: each entry uses 10% of your portfolio as margin. At 50x that is a position of 5x your equity — know your risk.
 - `SLIPPAGE_PCT=0.3`: worst acceptable price on market orders.
-- `STOP_PCT=0.3`, `LIT_STOP_PCT=1.0`: native hard stops from entry. Set either to `0` to disable it.
+- `STOP_PCT=0.3`, `LIT_STOP_PCT=1.0`, `HYPE_STOP_PCT=0.75`: native hard stops from entry. Set any to `0` to disable it.
 - `WEB_PORT=8787`: loopback port for the panel.
 - `ACCOUNT_INDEX`, `API_KEY_INDEX`, `API_PRIVATE_KEY`: only needed with `DRY_RUN=0`. Create a **dedicated API key index** at https://app.lighter.xyz/apikeys (not the one the web app uses). Never share the private key; it never leaves your machine except as local order signatures.
 

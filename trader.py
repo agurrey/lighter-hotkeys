@@ -21,14 +21,14 @@ DRY_RUN = os.environ.get("DRY_RUN", "1") == "1"
 TESTNET = os.environ.get("TESTNET", "0") == "1"
 URL = "https://testnet.zklighter.elliot.ai" if TESTNET else "https://mainnet.zklighter.elliot.ai"
 DEFAULT_SYMBOL = os.environ.get("SYMBOL", "BTC").upper()
-SYMBOLS = tuple(s.strip().upper() for s in os.environ.get("SYMBOLS", "BTC,LIT").split(",") if s.strip())
+SYMBOLS = tuple(s.strip().upper() for s in os.environ.get("SYMBOLS", "BTC,LIT,HYPE").split(",") if s.strip())
 if DEFAULT_SYMBOL not in SYMBOLS:
     SYMBOLS = (DEFAULT_SYMBOL, *SYMBOLS)
 MARGIN_PCT = float(os.environ.get("MARGIN_PCT", "10"))
 SLIPPAGE = float(os.environ.get("SLIPPAGE_PCT", "0.3")) / 100
 LEGACY_LEVERAGE = int(os.environ.get("LEVERAGE", "50"))
 LEGACY_STOP = float(os.environ.get("STOP_PCT", "0.3"))
-KNOWN_DEFAULTS = {"BTC": (50, 0.3), "LIT": (5, 1.0)}
+KNOWN_DEFAULTS = {"BTC": (50, 0.3), "LIT": (5, 1.0), "HYPE": (20, 0.75)}
 MARKET_SETTINGS = {}
 for symbol in SYMBOLS:
     known_leverage, known_stop = KNOWN_DEFAULTS.get(symbol, (LEGACY_LEVERAGE, LEGACY_STOP))
